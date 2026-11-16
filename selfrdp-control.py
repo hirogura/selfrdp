@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # selfRDP 制御 API
-#   - /                 : selfRDP ブランドの制御画面 (RDP クライアントを iframe で表示)
-#   - /api/status       : 稼働状態とバージョン
-#   - /api/restart      : selfRDP スタック (selfrdp / gateway / nginx) を再起動
-#   - /api/update       : GitHub (https://github.com/hirogura/selfrdp.git) から更新して再起動
+#   - /                  : selfRDP 制御画面 (接続フォーム + noVNC)
+#   - /api/status        : 稼働状態とバージョン
+#   - /api/session       : 現在の RDP セッション状態
+#   - /api/connect       : FreeRDP セッションを開始 (Xvfb + x11vnc + websockify + xfreerdp)
+#   - /api/disconnect    : RDP セッションを終了
+#   - /api/restart       : selfRDP スタック (selfrdp / gateway / nginx) を再起動
+#   - /api/update        : GitHub から更新して再起動
+#   - /api/log           : Web クライアント側エラーの記録 (デバッグ用)
 import http.server
 import json
 import os
@@ -17,19 +21,91 @@ REPO_DIR = HERE
 VERSION = "v.0.1.0"
 SERVICES = ["selfrdp.service", "devolutions-gateway.service", "nginx.service"]
 
-DEFAULT_INDEX = """<!doctype html><html lang="ja"><head><meta charset="utf-8">
-<title>selfRDP</title></head><body>
-<div style="background:#1b1f27;color:#fff;padding:12px;font-family:sans-serif">
-<b>selfRDP</b> <span>v.0.1.0</span>
-<button onclick="fetch('/api/update',{method:'POST'})">アップデート</button>
-<button onclick="fetch('/api/restart',{method:'POST'})">再起動</button>
-</div>
-<iframe src="/jet/webapp/client" style="width:100%;height:calc(100vh - 60px);border:0"></iframe>
-</body></html>"""
+DISPLAY = ":99"
+VNC_PORT = 5900
+WEBSOCKIFY_PORT = 6080
+
+_procs = []
+_lock = threading.Lock()
+_session = {"host": "", "username": "", "started": 0}
+
+
+def _terminate_procs():
+    global _procs
+    with _lock:
+        for proc in reversed(_procs):
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+        for proc in reversed(_procs):
+            try:
+                proc.wait(timeout=5)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+        _procs = []
+    _session.update(host="", username="", started=0)
+
+
+def _spawn(args, env=None):
+    return subprocess.Popen(
+        args,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+def _connect(host, username, password):
+    """FreeRDP セッションを開始する。"""
+    if not host or not username:
+        return False, "host と username は必須です"
+
+    _terminate_procs()
+
+    env = os.environ.copy()
+    env["DISPLAY"] = DISPLAY
+
+    try:
+        _procs.append(_spawn([
+            "Xvfb", DISPLAY, "-screen", "0", "1600x1000x24", "-nolisten", "tcp",
+        ]))
+        time.sleep(1)
+        _procs.append(_spawn([
+            "x11vnc", "-display", DISPLAY, "-listen", "127.0.0.1",
+            "-rfbport", str(VNC_PORT), "-forever", "-shared", "-nopw",
+        ]))
+        _procs.append(_spawn([
+            "websockify",
+            "127.0.0.1:%d" % WEBSOCKIFY_PORT,
+            "127.0.0.1:%d" % VNC_PORT,
+        ]))
+        time.sleep(1)
+
+        rdp_args = [
+            "xfreerdp3",
+            "/v:" + host,
+            "/u:" + username,
+            "/p:" + password,
+            "/cert:ignore",
+            "/f",
+            "/clipboard",
+            "+compression",
+        ]
+        _procs.append(_spawn(rdp_args, env=env))
+    except Exception as exc:
+        _terminate_procs()
+        return False, "セッション開始に失敗しました: " + str(exc)
+
+    _session.update(host=host, username=username, started=int(time.time()))
+    return True, "セッションを開始しました"
 
 
 def _restart():
-    """レスポンスを返した後に、少し待ってからサービスを再起動する。"""
     time.sleep(1)
     try:
         subprocess.Popen(
@@ -42,8 +118,47 @@ def _restart():
         pass
 
 
+def _gateway_token(host):
+    """Gateway の provisioner 鍵で RDP 用 ASSOCIATION トークンを署名する。"""
+    import time
+    import uuid
+    import jwt
+
+    key_path = "/etc/devolutions-gateway/provisioner.key"
+    try:
+        with open(key_path, encoding="utf-8") as fh:
+            key = fh.read()
+    except Exception as exc:
+        return False, "provisioner 鍵を読み込めません: " + str(exc)
+
+    now = int(time.time())
+    payload = {
+        "cert_thumb256": None,
+        "dst_alt": [],
+        "dst_hst": "tcp://%s:3389" % host,
+        "iat": now,
+        "nbf": now,
+        "exp": now + 60,
+        "jet_aid": str(uuid.uuid4()),
+        "jet_ap": "rdp",
+        "jet_cm": "fwd",
+        "jet_flt": False,
+        "jet_rec": "none",
+        "jet_reuse": 0,
+        "jet_ttl": 60,
+        "jti": str(uuid.uuid4()),
+    }
+    try:
+        token = jwt.encode(
+            payload, key, algorithm="RS256",
+            headers={"typ": "JWT", "cty": "ASSOCIATION"},
+        )
+        return True, token
+    except Exception as exc:
+        return False, "トークン署名に失敗しました: " + str(exc)
+
+
 def _update():
-    """リポジトリを GitHub の最新状態に同期する (ローカルの変更は消さない)。"""
     try:
         proc = subprocess.run(
             ["git", "-C", REPO_DIR, "pull", "--ff-only"],
@@ -51,10 +166,6 @@ def _update():
         )
         if proc.returncode != 0:
             return False, "更新に失敗しました: " + (proc.stderr or proc.stdout).strip()
-        # Gateway が更新されていた場合に備えて Web UI パッチを再適用する
-        patch = os.path.join(REPO_DIR, "patch-gateway-webapp.sh")
-        if os.path.isfile(patch):
-            subprocess.run(["bash", patch], capture_output=True, text=True, timeout=180)
         return True, "GitHub から selfRDP を更新しました"
     except Exception as exc:
         return False, "更新に失敗しました: " + str(exc)
@@ -76,11 +187,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             with open(INDEX_FILE, "r", encoding="utf-8") as fh:
                 return fh.read().encode("utf-8")
         except Exception:
-            return DEFAULT_INDEX.encode("utf-8")
+            return b"<!doctype html><title>selfRDP</title><h1>selfRDP v.0.1.0</h1>"
 
     def do_GET(self):
         path = self.path.split("?", 1)[0]
-        if path in ("/", "/index.html"):
+        if path == "/api/rdp-token":
+            host = ""
+            from urllib.parse import urlparse, parse_qs
+            params = parse_qs(urlparse(self.path).query)
+            host = params.get("host", [""])[0]
+            ok, result = _gateway_token(host)
+            self._json(200 if ok else 500, {"ok": ok, "token": result if ok else "", "message": "" if ok else result})
+        elif path in ("/", "/index.html"):
             body = self._index()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -89,17 +207,47 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(body)
         elif path == "/api/status":
             self._json(200, {"service": "selfRDP", "version": VERSION, "ok": True})
+        elif path == "/api/session":
+            self._json(200, {
+                "connected": bool(_session["host"]),
+                "host": _session["host"],
+                "username": _session["username"],
+            })
         else:
             self._json(404, {"ok": False, "error": "not found"})
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if path == "/api/restart":
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(length).decode("utf-8", "replace") if length else ""
+
+        if path == "/api/log":
+            try:
+                with open("/tmp/selfrdp-webclient-error.log", "a", encoding="utf-8") as fh:
+                    fh.write(raw[:2000] + "\n")
+            except Exception:
+                pass
+            self._json(200, {"ok": True})
+        elif path == "/api/connect":
+            try:
+                data = json.loads(raw)
+            except Exception:
+                data = {}
+            ok, msg = _connect(
+                data.get("host", "").strip(),
+                data.get("username", "").strip(),
+                data.get("password", ""),
+            )
+            self._json(200 if ok else 400, {"ok": ok, "message": msg})
+        elif path == "/api/disconnect":
+            _terminate_procs()
+            self._json(200, {"ok": True, "message": "セッションを終了しました"})
+        elif path == "/api/restart":
             self._json(200, {"ok": True, "message": "selfRDP を再起動します"})
             threading.Thread(target=_restart, daemon=True).start()
         elif path == "/api/update":
-            ok, message = _update()
-            self._json(200 if ok else 500, {"ok": ok, "message": message})
+            ok, msg = _update()
+            self._json(200 if ok else 500, {"ok": ok, "message": msg})
             if ok:
                 threading.Thread(target=_restart, daemon=True).start()
         else:

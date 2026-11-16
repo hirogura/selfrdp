@@ -53,7 +53,7 @@ fi
 # ---------------------------------------------------------------- 事前チェック
 [[ $EUID -eq 0 ]] || die "root で実行してください"
 command -v systemctl >/dev/null || die "systemd が使えません"
-for f in selfrdp-control.py selfrdp-index.html selfrdp-nginx.conf patch-gateway-webapp.sh; do
+for f in selfrdp-control.py selfrdp-index.html selfrdp-nginx.conf build-ironrdp.sh iron-assets/index.html iron-assets/pkg/ironrdp_web.js iron-assets/pkg/ironrdp_web_bg.wasm; do
   [[ -f "$SR_APP_DIR/$f" ]] || die "$SR_APP_DIR/$f が見つかりません"
 done
 
@@ -61,7 +61,8 @@ done
 log "基本パッケージを導入します"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq curl ca-certificates jq openssl argon2 python3 nginx git >/dev/null
+apt-get install -y -qq curl ca-certificates jq openssl argon2 python3 python3-jwt nginx git \
+  build-essential pkg-config libssl-dev >/dev/null
 
 if ! command -v tailscale >/dev/null 2>&1; then
   log "Tailscale を導入します"
@@ -154,9 +155,11 @@ chmod 600 "$CFG_DIR/provisioner.key" "$USERS"
 systemctl enable devolutions-gateway >/dev/null 2>&1 || true
 systemctl restart devolutions-gateway
 
-# KRDP などの TLS+PAM 方式 RDP サーバに接続できるよう、Web クライアントの
-# CredSSP (NLA) を無効化するパッチを当てる
-bash "$SR_APP_DIR/patch-gateway-webapp.sh"
+# ---------------------------------------- IronRDP (Rust + WASM) クライアント
+log "IronRDP WASM クライアントを配置します"
+# ビルド済みアセットをリポジトリから使用する (再ビルドする場合は build-ironrdp.sh)
+[[ -f "$SR_APP_DIR/iron-assets/index.html" ]] || die "iron-assets が見つかりません"
+chmod 0755 "$SR_APP_DIR/build-ironrdp.sh"
 
 # ------------------------------------------ selfRDP 制御画面 / API / プロキシ
 log "selfRDP の制御画面・制御 API・リバースプロキシを設定します"
