@@ -3,9 +3,10 @@
 #
 # Devolutions Gateway 同梱の IronRDP は KRDP (KDE) / GNOME Remote Desktop が
 # 送る Server Deactivate All と EGFX (Graphics Pipeline) に対応していない。
-# ここでは upstream master に対して次の 2 点を適用してビルドする:
+# ここでは upstream master に対して次の 3 点を適用してビルドする:
 #   1. support_dyn_vc_gfx_protocol = true (EGFX を広告する)
 #   2. DrdynvcClient に GraphicsPipelineClient を接続する (描画を受け取る)
+#   3. WebCodecs を使う H.264 デコーダを接続する (AVC420 を有効化して高速化)
 set -Eeuo pipefail
 
 IRONRDP_URL="${IRONRDP_URL:-https://github.com/Devolutions/IronRDP.git}"
@@ -34,6 +35,7 @@ fi
 
 # パッチ 2: EGFX DVC を接続する
 if ! grep -q 'WebEgfxHandler' crates/ironrdp-web/src/session.rs; then
+  PATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ironrdp-patch"
   python3 - <<'PY'
 p = 'crates/ironrdp-web/src/session.rs'
 s = open(p).read()
@@ -72,10 +74,23 @@ if ! grep -q 'ironrdp-egfx' crates/ironrdp-web/Cargo.toml; then
   sed -i 's|ironrdp-core.path = "../ironrdp-core"|ironrdp-egfx.path = "../ironrdp-egfx"\nironrdp-core.path = "../ironrdp-core"|' crates/ironrdp-web/Cargo.toml
 fi
 
+# パッチ 3: WebCodecs H.264 デコーダを組み込む
+PATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ironrdp-patch"
+if ! grep -q 'mod h264_webcodecs;' crates/ironrdp-web/src/lib.rs; then
+  sed -i 's/mod audio;/mod audio;\\nmod h264_webcodecs;/' crates/ironrdp-web/src/lib.rs
+fi
+if ! grep -q 'h264_webcodecs::WebCodecsH264' crates/ironrdp-web/src/session.rs; then
+  sed -i 's/use ironrdp::dvc::DrdynvcClient;/use ironrdp::dvc::DrdynvcClient;\\nuse crate::h264_webcodecs::WebCodecsH264;/' crates/ironrdp-web/src/session.rs
+  sed -i 's/GraphicsPipelineClient::new(Box::new(WebEgfxHandler), None)/GraphicsPipelineClient::new(Box::new(WebEgfxHandler), Some(Box::new(WebCodecsH264::new())))/' crates/ironrdp-web/src/session.rs
+fi
+cp -f "$PATCH_DIR/h264_webcodecs.rs" crates/ironrdp-web/src/h264_webcodecs.rs
+
 cd crates/ironrdp-web
 RUSTFLAGS='-Ctarget-feature=+simd128,+bulk-memory --cfg getrandom_backend="wasm_js" -Copt-level=s -Ccodegen-units=1' \
   wasm-pack build --target web
 
 mkdir -p "$DEST"
 cp -f pkg/ironrdp_web.js pkg/ironrdp_web_bg.wasm "$DEST/"
+rm -rf "$DEST/snippets"
+cp -r pkg/snippets "$DEST/"
 echo "IronRDP WASM を $DEST に配置しました"

@@ -18,7 +18,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 INDEX_FILE = os.path.join(HERE, "selfrdp-index.html")
 REPO_DIR = HERE
-VERSION = "v.0.1.0"
+VERSION = "v.0.2.0"
 SERVICES = ["selfrdp.service", "devolutions-gateway.service", "nginx.service"]
 
 DISPLAY = ":99"
@@ -187,7 +187,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             with open(INDEX_FILE, "r", encoding="utf-8") as fh:
                 return fh.read().encode("utf-8")
         except Exception:
-            return b"<!doctype html><title>selfRDP</title><h1>selfRDP v.0.1.0</h1>"
+            return b"<!doctype html><title>selfRDP</title><h1>selfRDP v.0.2.0</h1>"
 
     def do_GET(self):
         path = self.path.split("?", 1)[0]

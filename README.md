@@ -8,14 +8,15 @@ RDP の描画は **IronRDP（Rust）を WebAssembly 化したクライアント*
 
 - `install-selfrdp.sh` — インストーラ（selfRDP コンテナ内で root 実行）
 - `selfrdp-control.py` — 制御 API（トークン発行 / アップデート / 再起動）
-- `iron-assets/` — IronRDP の WASM とトップページ（selfRDP / v.0.1.0 / アップデート / 再起動）
+- `iron-assets/` — IronRDP の WASM とトップページ（selfRDP / v.0.2.0 / アップデート / 再起動）
 - `selfrdp-nginx.conf` — リバースプロキシ（トップページ・API・Gateway WebSocket を振り分け）
 - `build-ironrdp.sh` — IronRDP master を WASM ビルドして `iron-assets/pkg` を更新するスクリプト
 
-IronRDP は upstream master に対して次のパッチを適用してビルドしています（KRDP / GNOME Remote Desktop 対応）:
+IronRDP は upstream master に対して次のパッチを適用してビルドしています（KRDP / GNOME Remote Desktop 対応・高速化）:
 
 1. `support_dyn_vc_gfx_protocol = true` — EGFX (Graphics Pipeline) を広告する
 2. `DrdynvcClient` に `GraphicsPipelineClient` を接続し、デコードしたフレームを canvas に描画する
+3. WebCodecs (`VideoDecoder`) を使う H.264 デコーダを接続し、AVC420 を有効化する（`ironrdp-patch/h264_webcodecs.rs`）
 
 ## 使い方
 
