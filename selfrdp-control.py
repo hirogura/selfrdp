@@ -51,6 +51,10 @@ def _update():
         )
         if proc.returncode != 0:
             return False, "更新に失敗しました: " + (proc.stderr or proc.stdout).strip()
+        # Gateway が更新されていた場合に備えて Web UI パッチを再適用する
+        patch = os.path.join(REPO_DIR, "patch-gateway-webapp.sh")
+        if os.path.isfile(patch):
+            subprocess.run(["bash", patch], capture_output=True, text=True, timeout=180)
         return True, "GitHub から selfRDP を更新しました"
     except Exception as exc:
         return False, "更新に失敗しました: " + str(exc)

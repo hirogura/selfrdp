@@ -53,7 +53,7 @@ fi
 # ---------------------------------------------------------------- 事前チェック
 [[ $EUID -eq 0 ]] || die "root で実行してください"
 command -v systemctl >/dev/null || die "systemd が使えません"
-for f in selfrdp-control.py selfrdp-index.html selfrdp-nginx.conf; do
+for f in selfrdp-control.py selfrdp-index.html selfrdp-nginx.conf patch-gateway-webapp.sh; do
   [[ -f "$SR_APP_DIR/$f" ]] || die "$SR_APP_DIR/$f が見つかりません"
 done
 
@@ -153,6 +153,10 @@ chmod 600 "$CFG_DIR/provisioner.key" "$USERS"
 
 systemctl enable devolutions-gateway >/dev/null 2>&1 || true
 systemctl restart devolutions-gateway
+
+# KRDP などの TLS+PAM 方式 RDP サーバに接続できるよう、Web クライアントの
+# CredSSP (NLA) を無効化するパッチを当てる
+bash "$SR_APP_DIR/patch-gateway-webapp.sh"
 
 # ------------------------------------------ selfRDP 制御画面 / API / プロキシ
 log "selfRDP の制御画面・制御 API・リバースプロキシを設定します"
