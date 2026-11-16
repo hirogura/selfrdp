@@ -4,8 +4,6 @@ export class WebCodecsDecoder {
     this.canvas = new OffscreenCanvas(1, 1);
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
     this.frame = null;
-    this.yuv = null;
-    this.yuvTs = -1;
     this.width = 0;
     this.height = 0;
     this.error = null;
@@ -17,45 +15,22 @@ export class WebCodecsDecoder {
   reset() {
     if (this.decoder) { try { this.decoder.close(); } catch (e) {} }
     this.frame = null;
-    this.yuv = null;
-    this.yuvTs = -1;
     this.error = null;
     this.ok = false;
     const self = this;
     try {
       this.decoder = new VideoDecoder({
-        async output(frame) {
-          const ts = frame.timestamp;
+        output(frame) {
           try {
-            const w = frame.displayWidth, h = frame.displayHeight;
-            if (self.canvas.width !== w || self.canvas.height !== h) {
-              self.canvas.width = w;
-              self.canvas.height = h;
+            if (self.canvas.width !== frame.displayWidth || self.canvas.height !== frame.displayHeight) {
+              self.canvas.width = frame.displayWidth;
+              self.canvas.height = frame.displayHeight;
             }
             self.ctx.drawImage(frame, 0, 0);
-            const img = self.ctx.getImageData(0, 0, w, h);
-            if (ts >= self.yuvTs) {
-              self.yuvTs = ts;
-              self.frame = new Uint8Array(img.data.buffer);
-              self.width = w;
-              self.height = h;
-            }
-            // Also expose YUV 4:2:0 planes for AVC444 / correct color conversion.
-            const lw = w;
-            const cw = Math.ceil(w / 2);
-            const ch = Math.ceil(h / 2);
-            const ys = lw * h, cs = cw * ch;
-            const buf = new Uint8Array(ys + 2 * cs);
-            await frame.copyTo(buf, { format: 'I420', layout: [
-              { offset: 0, stride: lw },
-              { offset: ys, stride: cw },
-              { offset: ys + cs, stride: cw }
-            ] });
-            if (ts >= self.yuvTs) {
-              self.yuv = { w: w, h: h, lw: lw, cw: cw,
-                y: buf.slice(0, ys), u: buf.slice(ys, ys + cs), v: buf.slice(ys + cs) };
-              self.yuvTs = ts;
-            }
+            const img = self.ctx.getImageData(0, 0, self.canvas.width, self.canvas.height);
+            self.frame = new Uint8Array(img.data.buffer);
+            self.width = frame.displayWidth;
+            self.height = frame.displayHeight;
           } catch (e) {
             self.error = String(e);
             console.error('WebCodecs H264 output error', String(e));
@@ -98,14 +73,6 @@ export class WebCodecsDecoder {
     }
   }
 
-  hasYuv() { return this.yuv !== null; }
-  y() { return this.yuv ? this.yuv.y : null; }
-  u() { return this.yuv ? this.yuv.u : null; }
-  v() { return this.yuv ? this.yuv.v : null; }
-  yw() { return this.yuv ? this.yuv.w : 0; }
-  yh() { return this.yuv ? this.yuv.h : 0; }
-  ylw() { return this.yuv ? this.yuv.lw : 0; }
-  ycw() { return this.yuv ? this.yuv.cw : 0; }
   pop() { const f = this.frame; this.frame = null; return f; }
   w() { return this.width; }
   h() { return this.height; }
