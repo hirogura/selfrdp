@@ -38,7 +38,7 @@ SR_APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SR_REPO_URL="https://github.com/hirogura/selfrdp.git"
 SR_API_PORT=7172
 SR_NGINX_PORT=7173
-SR_VERSION="v.0.2.0"
+SR_VERSION="v.0.3.0"
 
 log()  { printf '\033[1;34m[selfRDP]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
@@ -53,9 +53,10 @@ fi
 # ---------------------------------------------------------------- 事前チェック
 [[ $EUID -eq 0 ]] || die "root で実行してください"
 command -v systemctl >/dev/null || die "systemd が使えません"
-for f in selfrdp-control.py selfrdp-index.html selfrdp-nginx.conf build-ironrdp.sh iron-assets/index.html iron-assets/pkg/ironrdp_web.js iron-assets/pkg/ironrdp_web_bg.wasm; do
+for f in selfrdp-control.py selfrdp-nginx.conf build-ironrdp.sh iron-assets/index.html iron-assets/favicon.svg iron-assets/pkg/ironrdp_web.js iron-assets/pkg/ironrdp_web_bg.wasm; do
   [[ -f "$SR_APP_DIR/$f" ]] || die "$SR_APP_DIR/$f が見つかりません"
 done
+[[ -d "$SR_APP_DIR/iron-assets/pkg/snippets" ]] || die "iron-assets/pkg/snippets が見つかりません"
 
 # ------------------------------------------------- 基本パッケージ + Tailscale
 log "基本パッケージを導入します"
@@ -160,6 +161,15 @@ log "IronRDP WASM クライアントを配置します"
 # ビルド済みアセットをリポジトリから使用する (再ビルドする場合は build-ironrdp.sh)
 [[ -f "$SR_APP_DIR/iron-assets/index.html" ]] || die "iron-assets が見つかりません"
 chmod 0755 "$SR_APP_DIR/build-ironrdp.sh"
+
+# ------------------------------------------ 接続先データ (ワークスペース外)
+log "接続先データディレクトリを用意します"
+mkdir -p -m 0700 /opt/selfrdp-data
+chmod 0700 /opt/selfrdp-data
+if [[ ! -f /opt/selfrdp-data/profiles.json ]]; then
+  printf '{"profiles":[]}\n' > /opt/selfrdp-data/profiles.json
+  chmod 0600 /opt/selfrdp-data/profiles.json
+fi
 
 # ------------------------------------------ selfRDP 制御画面 / API / プロキシ
 log "selfRDP の制御画面・制御 API・リバースプロキシを設定します"

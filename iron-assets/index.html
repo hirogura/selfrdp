@@ -1,65 +1,111 @@
 <!doctype html>
 <html lang="ja">
 <head>
-
-
-
-
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>selfRDP</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root { color-scheme: dark; }
   html, body { height: 100%; margin: 0; }
-  body { font-family: system-ui, sans-serif; background: #141821; color: #e7ecf3; }
-  #bar { height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
-    background: #1b1f27; border-bottom: 1px solid #2b3240; }
-  #bar .title { font-weight: 700; font-size: 18px; }
-  #bar .ver { color: #8d9bb0; font-size: 12px; }
-  #msg { color: #e0a458; font-size: 12px; }
-  #wrap { height: calc(100% - 48px); display: flex; align-items: center; justify-content: center; }
-  #form { width: 380px; padding: 24px; background: #1b1f27; border: 1px solid #2b3240; border-radius: 10px; }
-  #form h2 { margin: 0 0 14px; font-size: 16px; }
-  label { display: block; color: #8d9bb0; font-size: 12px; margin: 10px 0 4px; }
-  input { width: 100%; box-sizing: border-box; padding: 9px 11px; border-radius: 6px;
-    border: 1px solid #3a4457; background: #12161e; color: #e7ecf3; font: inherit; }
-  button { margin-top: 16px; width: 100%; padding: 9px; border: 0; border-radius: 6px;
-    background: #0068c3; color: #fff; font: inherit; cursor: pointer; }
-  button:disabled { opacity: .5; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #141821; color: #e7ecf3; }
+  #bar { height: 48px; box-sizing: border-box; display: flex; align-items: center; gap: 10px;
+    padding: 0 14px; background: #1b1f27; border-bottom: 1px solid #2b3240; }
+  #bar .title { font-size: 18px; font-weight: 700; }
+  #bar .ver { font-size: 12px; color: #8d9bb0; margin-right: auto; }
+  button { font: inherit; font-size: 12px; padding: 5px 10px; border-radius: 6px; cursor: pointer;
+    border: 1px solid #3a4457; background: #262d3b; color: #e7ecf3; }
+  button:hover { background: #313a4c; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: #0068c3; border-color: #007ad9; }
+  button.danger { background: #7a2630; border-color: #a33b48; }
+  #msg { font-size: 12px; color: #e0a458; }
+  #keys { display: none; align-items: center; gap: 5px; flex-wrap: wrap; }
+  #wrap { height: calc(100% - 48px); display: flex; align-items: center; justify-content: center; overflow: auto; }
+  #form { width: 420px; max-width: calc(100% - 24px); padding: 20px; box-sizing: border-box;
+    background: #1b1f27; border: 1px solid #2b3240; border-radius: 10px; }
+  #form h2 { margin: 0 0 12px; font-size: 16px; }
+  label { display: block; color: #8d9bb0; font-size: 11px; margin: 9px 0 3px; }
+  input, select { width: 100%; box-sizing: border-box; padding: 7px 9px; border-radius: 6px;
+    border: 1px solid #3a4457; background: #12161e; color: #e7ecf3; font: inherit; font-size: 13px; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  .checks { display: flex; gap: 14px; margin-top: 12px; font-size: 12px; }
+  .checks label { color: #c9d2e0; display: flex; align-items: center; gap: 5px; margin: 0; }
+  .checks input { width: auto; }
+  #actions { display: flex; gap: 8px; margin-top: 14px; }
+  #actions button { flex: 1; }
   #session { height: calc(100% - 48px); display: none; background: #000; }
   canvas { display: block; width: 100%; height: 100%; outline: none; }
+  #hint { font-size: 11px; color: #77849a; margin-top: 10px; }
 </style>
 </head>
 <body>
   <div id="bar">
-    <span class="title">selfRDP</span><span class="ver">v.0.2.0</span>
-    <span style="flex:1"></span>
+    <span class="title">selfRDP</span><span class="ver">v.0.3.0</span>
+    <span id="keys">
+      <button type="button" data-key="halfwidth">半角/全角</button>
+      <button type="button" data-key="henkan">変換</button>
+      <button type="button" data-key="muhenkan">無変換</button>
+      <button type="button" data-key="ctrlaltdel">Ctrl+Alt+Del</button>
+      <button type="button" data-key="win">Win</button>
+      <button type="button" data-key="altTab">Alt+Tab</button>
+      <button type="button" data-key="taskmgr">Ctrl+Shift+Esc</button>
+      <button type="button" data-key="printscreen">PrtSc</button>
+    </span>
     <span id="msg"></span>
-    <button id="btn-update" type="button" style="width:auto;margin:0">アップデート</button>
-    <button id="btn-restart" type="button" style="width:auto;margin:0">再起動</button>
+    <button id="btn-update" type="button">アップデート</button>
+    <button id="btn-restart" type="button">再起動</button>
+    <button id="btn-disconnect" type="button" class="danger" style="display:none">切断</button>
   </div>
   <div id="wrap">
     <form id="form">
-      <h2>RDP に接続 (IronRDP WASM)</h2>
-      <label for="host">ホスト名 / IP</label>
-      <input id="host" placeholder="ホスト名 / IP" required>
-      <label for="username">ユーザー名</label>
-      <input id="username" autocomplete="username" required>
-      <label for="password">パスワード</label>
-      <input id="password" type="password" autocomplete="current-password" required>
-      <button id="connect" type="submit">接続</button>
+      <h2>リモートデスクトップに接続</h2>
+      <label for="profile">保存済みの接続先</label>
+      <select id="profile"><option value="">-- 新規 --</option></select>
+      <label for="name">プロファイル名</label>
+      <input id="name" placeholder="例: 作業用 PC">
+      <div class="row">
+        <div><label for="host">ホスト名 / IP</label><input id="host" placeholder="PC 名 / IP" required></div>
+        <div><label for="username">ユーザー名</label><input id="username" autocomplete="username"></div>
+      </div>
+      <div class="row">
+        <div><label for="password">パスワード</label><input id="password" type="password" autocomplete="current-password"></div>
+        <div><label for="resolution">解像度</label>
+          <select id="resolution">
+            <option value="1024x768">1024 x 768</option>
+            <option value="1280x800" selected>1280 x 800</option>
+            <option value="1600x900">1600 x 900</option>
+            <option value="1920x1080">1920 x 1080</option>
+          </select>
+        </div>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="autodetect" checked> 方式を自動判定</label>
+        <label><input type="checkbox" id="credssp"> NLA / CredSSP を使う</label>
+        <label><input type="checkbox" id="perf" checked> 描画を軽量化</label>
+      </div>
+      <div id="actions">
+        <button id="btn-save" type="button">保存</button>
+        <button id="btn-delete" type="button">削除</button>
+        <button id="btn-connect" class="primary" type="submit">接続</button>
+      </div>
+      <div id="hint">パスワードは保存されません。接続先の設定のみ /opt/selfrdp-data に保存されます。</div>
     </form>
   </div>
   <div id="session"><canvas id="canvas" tabindex="0"></canvas></div>
 <script type="module">
 import init, { SessionBuilder, DesktopSize, Extension, setup, InputTransaction, DeviceEvent } from './pkg/ironrdp_web.js';
 
-const msg = document.getElementById('msg');
-const wrap = document.getElementById('wrap');
-const sessionDiv = document.getElementById('session');
-const canvas = document.getElementById('canvas');
+const $ = id => document.getElementById(id);
+const msg = $('msg');
+const form = $('form');
+const wrap = $('wrap');
+const sessionDiv = $('session');
+const canvas = $('canvas');
+const keys = $('keys');
+const disconnectBtn = $('btn-disconnect');
 
-// DOM key -> RDP scancode (minimal but covers common keys)
 const scancodes = {
   KeyA:30,KeyB:48,KeyC:46,KeyD:32,KeyE:18,KeyF:33,KeyG:34,KeyH:35,KeyI:23,KeyJ:36,KeyK:37,KeyL:38,
   KeyM:50,KeyN:49,KeyO:24,KeyP:25,KeyQ:16,KeyR:19,KeyS:31,KeyT:20,KeyU:22,KeyV:47,KeyW:17,KeyX:45,KeyY:21,KeyZ:44,
@@ -68,8 +114,24 @@ const scancodes = {
   AltLeft:56,AltRight:100,MetaLeft:91,ArrowUp:72,ArrowDown:80,ArrowLeft:75,ArrowRight:77,
   F1:59,F2:60,F3:61,F4:62,F5:63,F6:64,F7:65,F8:66,F9:67,F10:68,F11:87,F12:88,
   Minus:12,Equal:13,BracketLeft:26,BracketRight:27,Backslash:43,Semicolon:39,Quote:40,
-  Comma:51,Period:52,Slash:53,Backquote:41,CapsLock:58,Delete:83,Home:71,End:79,PageUp:73,PageDown:81
+  Comma:51,Period:52,Slash:53,Backquote:41,CapsLock:58,Delete:83,Home:71,End:79,PageUp:73,PageDown:81,
+  // Japanese keyboard
+  IntlYen:124,KanaMode:112,Katakana:112,Hiragana:113,NonConvert:123,Convert:125,
 };
+
+const special = {
+  halfwidth:  [0x29],          // 半角/全角/漢字
+  henkan:     [125],           // 変換
+  muhenkan:   [123],           // 無変換
+  ctrlaltdel: [29, 56, 83],    // Ctrl + Alt + Delete
+  win:        [91],
+  altTab:     [56, 15],
+  taskmgr:    [29, 42, 1],     // Ctrl + Shift + Esc
+  printscreen:[0x37],
+};
+
+let currentSession = null;
+let profiles = [];
 
 function sendTransaction(events) {
   if (!currentSession) return;
@@ -78,18 +140,13 @@ function sendTransaction(events) {
   currentSession.applyInputs(t);
 }
 
-let currentSession = null;
-
 function bindInput(session) {
   currentSession = session;
   canvas.addEventListener('mousemove', e => {
     const r = canvas.getBoundingClientRect();
-    // canvas の内部解像度と CSS 表示サイズの比率を反映する
-    const scaleX = (canvas.width || r.width) / r.width;
-    const scaleY = (canvas.height || r.height) / r.height;
-    const x = (e.clientX - r.left) * scaleX;
-    const y = (e.clientY - r.top) * scaleY;
-    sendTransaction([DeviceEvent.mouseMove(x, y)]);
+    const sx = (canvas.width || r.width) / r.width;
+    const sy = (canvas.height || r.height) / r.height;
+    sendTransaction([DeviceEvent.mouseMove((e.clientX - r.left) * sx, (e.clientY - r.top) * sy)]);
   });
   canvas.addEventListener('mousedown', e => sendTransaction([DeviceEvent.mouseButtonPressed(e.button)]));
   canvas.addEventListener('mouseup', e => sendTransaction([DeviceEvent.mouseButtonReleased(e.button)]));
@@ -105,70 +162,155 @@ function bindInput(session) {
     const sc = scancodes[e.code];
     if (sc !== undefined) { e.preventDefault(); sendTransaction([DeviceEvent.keyReleased(sc)]); }
   });
+  keys.querySelectorAll('button[data-key]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const seq = special[btn.dataset.key] || [];
+      const down = seq.map(sc => DeviceEvent.keyPressed(sc));
+      sendTransaction(down);
+      setTimeout(() => sendTransaction(seq.slice().reverse().map(sc => DeviceEvent.keyReleased(sc))), 90);
+      canvas.focus();
+    });
+  });
 }
 
-async function connect(host, username, password) {
+function showSession(on) {
+  wrap.style.display = on ? 'none' : 'flex';
+  sessionDiv.style.display = on ? 'block' : 'none';
+  keys.style.display = on ? 'flex' : 'none';
+  disconnectBtn.style.display = on ? '' : 'none';
+}
+
+function profileData() {
+  const res = $('resolution').value.split('x');
+  return {
+    name: $('name').value.trim(),
+    host: $('host').value.trim(),
+    username: $('username').value.trim(),
+    autodetect: $('autodetect').checked,
+    credssp: $('credssp').checked,
+    width: Number(res[0]), height: Number(res[1]),
+    perf: $('perf').checked ? 0x87 : 0,
+  };
+}
+
+function applyProfile(p) {
+  $('name').value = p.name || '';
+  $('host').value = p.host || '';
+  $('username').value = p.username || '';
+  $('autodetect').checked = p.autodetect !== false;
+  $('credssp').checked = !!p.credssp;
+  $('perf').checked = p.perf !== 0;
+  $('resolution').value = (p.width || 1280) + 'x' + (p.height || 800);
+}
+
+async function loadProfiles() {
+  const r = await fetch('/api/profiles');
+  const j = await r.json();
+  profiles = j.profiles || [];
+  const sel = $('profile');
+  sel.innerHTML = '<option value="">-- 新規 --</option>' +
+    profiles.map((p, i) => `<option value="${i}">${p.name}</option>`).join('');
+  if (profiles.length) { sel.value = '0'; applyProfile(profiles[0]); }
+}
+
+$('profile').addEventListener('change', e => {
+  const i = e.target.value;
+  if (i === '') { $('name').value = ''; return; }
+  applyProfile(profiles[Number(i)]);
+});
+
+$('btn-save').addEventListener('click', async () => {
+  const r = await fetch('/api/profiles', { method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ action: 'save', profile: profileData() }) });
+  const j = await r.json();
+  msg.textContent = j.message || '';
+  await loadProfiles();
+});
+
+$('btn-delete').addEventListener('click', async () => {
+  const name = $('name').value.trim();
+  if (!name || !confirm('プロファイル「' + name + '」を削除しますか？')) return;
+  const r = await fetch('/api/profiles', { method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ action: 'delete', name }) });
+  const j = await r.json();
+  msg.textContent = j.message || '';
+  await loadProfiles();
+});
+
+async function connect(p) {
+  if (p.autodetect) {
+    msg.textContent = '接続方式を判定中…';
+    try {
+      const pr = await fetch('/api/probe?host=' + encodeURIComponent(p.host));
+      const pj = await pr.json();
+      if (pj.ok) p.credssp = !!pj.credssp;
+    } catch (e) { /* 判定失敗時は手動設定を使う */ }
+  }
   msg.textContent = '初期化中…';
   await init();
   setup('info');
   msg.textContent = 'トークン取得中…';
-  const tr = await fetch('/api/rdp-token?host=' + encodeURIComponent(host));
+  const tr = await fetch('/api/rdp-token?host=' + encodeURIComponent(p.host));
   const tj = await tr.json();
   if (!tj.ok) throw new Error(tj.message || 'トークン取得に失敗');
 
   msg.textContent = '接続中…';
   const builder = new SessionBuilder()
-    .destination(host)
+    .destination(p.host)
     .proxyAddress(`wss://${location.host}/jet/rdp`)
     .authToken(tj.token)
-    .username(username)
-    .password(password)
-    .desktopSize(new DesktopSize(1280, 800))
+    .username(p.username)
+    .password($('password').value)
+    .desktopSize(new DesktopSize(p.width, p.height))
     .renderCanvas(canvas)
     .setCursorStyleCallbackContext(canvas)
     .setCursorStyleCallback(() => {})
-    .extension(new Extension('enable_credssp', false));
+    .extension(new Extension('enable_credssp', p.credssp));
+  if (p.perf) builder.extension(new Extension('performance_flags', p.perf));
 
   const session = await builder.connect();
-  wrap.style.display = 'none';
-  sessionDiv.style.display = 'block';
+  showSession(true);
   msg.textContent = '';
   canvas.focus();
   bindInput(session);
   const info = await session.run();
   msg.textContent = 'セッション終了: ' + info.reason();
   currentSession = null;
+  showSession(false);
 }
 
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('btn-connect');
+  btn.disabled = true;
+  try { await connect(profileData()); }
+  catch (err) { msg.textContent = 'Connection failed: ' + (err && err.backtrace ? err.backtrace() : err); }
+  finally { btn.disabled = false; }
+});
+
+disconnectBtn.addEventListener('click', () => {
+  if (!currentSession || !confirm('接続を切断しますか？')) return;
+  currentSession.shutdown();
+  currentSession = null;
+  showSession(false);
+  msg.textContent = '切断しました';
+});
+
 async function controlApi(action) {
-  const r = await fetch('/api/' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+  const r = await fetch('/api/' + action, { method: 'POST', headers: {'Content-Type':'application/json'} });
   return r.json();
 }
-document.getElementById('btn-update').addEventListener('click', async () => {
+$('btn-update').addEventListener('click', async () => {
   if (!confirm('GitHub から selfRDP をアップデートして再起動しますか？')) return;
-  const j = await controlApi('update');
-  msg.textContent = j.message || '';
+  const j = await controlApi('update'); msg.textContent = j.message || '';
 });
-document.getElementById('btn-restart').addEventListener('click', async () => {
+$('btn-restart').addEventListener('click', async () => {
   if (!confirm('selfRDP サービスを再起動しますか？')) return;
-  const j = await controlApi('restart');
-  msg.textContent = j.message || '';
+  const j = await controlApi('restart'); msg.textContent = j.message || '';
   setTimeout(() => location.reload(), 4000);
 });
 
-document.getElementById('form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const btn = document.getElementById('connect');
-  btn.disabled = true;
-  try {
-    await connect(document.getElementById('host').value.trim(),
-      document.getElementById('username').value.trim(),
-      document.getElementById('password').value);
-  } catch (err) {
-    msg.textContent = 'Connection failed: ' + (err && err.backtrace ? err.backtrace() : err);
-    console.error(err);
-  } finally { btn.disabled = false; }
-});
+loadProfiles();
 </script>
 </body>
 </html>
