@@ -53,13 +53,13 @@
   #hint { font-size: 10px; color: #77849a; margin-top: 9px; }
   #session { position: absolute; inset: 0; width: auto; height: auto; display: none; background: #000;
     align-items: center; justify-content: center; overflow: hidden; }
-  /* 比率を保ったまま領域に収める (JS が働かなくても縮小は効く) */
-  canvas { display: block; outline: none; max-width: 100%; max-height: 100%; width: auto; height: auto; }
+  /* 箱は領域いっぱい、中身は object-fit で比率維持して全体表示 */
+  canvas { display: block; outline: none; width: 100%; height: 100%; object-fit: contain; }
 </style>
 </head>
 <body>
   <div id="bar">
-    <span class="title">selfRDP</span><span class="ver">v.0.6.1</span>
+    <span class="title">selfRDP</span><span class="ver">v.0.6.2</span>
     <span id="keys">
       <button type="button" data-key="halfwidth">半角/全角</button>
       <button type="button" data-key="henkan">変換</button>
@@ -162,20 +162,18 @@ let activeIndex = -1;
 
 function updateView() {
   if (!currentSession) return;
-  const cw = canvas.width || 1280;
-  const ch = canvas.height || 800;
-  // 表示領域はウィンドウ基準で計算する (親要素のパーセント高に依存しない)
-  const sidebar = $('sidebar');
-  const aw = Math.max(1, document.documentElement.clientWidth - (sidebar ? sidebar.offsetWidth : 0));
-  const ah = Math.max(1, window.innerHeight - 48);
-  const scale = Math.min(aw / cw, ah / ch);
   const mode = $('viewmode').value;
-  const s = mode === 'native' ? 1 : mode === 'fill' ? scale : Math.min(1, scale);
-  canvas.style.maxWidth = 'none';
-  canvas.style.maxHeight = 'none';
-  canvas.style.width = Math.max(1, Math.floor(cw * s)) + 'px';
-  canvas.style.height = Math.max(1, Math.floor(ch * s)) + 'px';
-  sessionDiv.style.overflow = mode === 'native' ? 'auto' : 'hidden';
+  if (mode === 'native') {
+    canvas.style.width = (canvas.width || 1280) + 'px';
+    canvas.style.height = (canvas.height || 800) + 'px';
+    canvas.style.objectFit = 'contain';
+    sessionDiv.style.overflow = 'auto';
+  } else {
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.objectFit = mode === 'fill' ? 'fill' : 'contain';
+    sessionDiv.style.overflow = 'hidden';
+  }
 }
 window.addEventListener('resize', updateView);
 $('viewmode').addEventListener('change', updateView);
@@ -197,9 +195,19 @@ function bindInput(session) {
   updateView();
   canvas.addEventListener('mousemove', e => {
     const r = canvas.getBoundingClientRect();
-    const sx = (canvas.width || r.width) / r.width;
-    const sy = (canvas.height || r.height) / r.height;
-    sendTransaction([DeviceEvent.mouseMove((e.clientX - r.left) * sx, (e.clientY - r.top) * sy)]);
+    const cw = canvas.width || 1280, ch = canvas.height || 800;
+    const mode = $('viewmode').value;
+    let scaleX = r.width / cw, scaleY = r.height / ch, ox = 0, oy = 0;
+    if (mode !== 'fill') {
+      // object-fit: contain のレターボックスを差し引く
+      const s = Math.min(r.width / cw, r.height / ch);
+      scaleX = scaleY = s;
+      ox = (r.width - cw * s) / 2;
+      oy = (r.height - ch * s) / 2;
+    }
+    const x = (e.clientX - r.left - ox) / scaleX;
+    const y = (e.clientY - r.top - oy) / scaleY;
+    sendTransaction([DeviceEvent.mouseMove(x, y)]);
   });
   canvas.addEventListener('mousedown', e => sendTransaction([DeviceEvent.mouseButtonPressed(e.button)]));
   canvas.addEventListener('mouseup', e => sendTransaction([DeviceEvent.mouseButtonReleased(e.button)]));
