@@ -27,12 +27,14 @@ bash install-selfrdp.sh
 - 「方式を自動判定」を ON にすると、対象の RDP 応答を調べて NLA(CredSSP) / TLS を自動で切り替えます
   - KDE (KRDP) は TLS、Ubuntu (GNOME) は NLA を要求します
 - 接続中は「切断」ボタン、および 半角/全角・変換・無変換・Ctrl+Alt+Del・Win・Alt+Tab・Ctrl+Shift+Esc・PrtSc の特殊キーを送信できます
+- 表示サイズは「縮小して全体表示（比率維持・拡大なし）」「ウィンドウに合わせる」「原寸大」から選べます。全画面ボタンもあります
 - 「アップデート」は GitHub から更新して再起動、「再起動」はサービスを再起動します
 
 IronRDP のパッチ内容:
 
 1. `support_dyn_vc_gfx_protocol = true` — EGFX (Graphics Pipeline) を広告
 2. `DrdynvcClient` に `GraphicsPipelineClient` を接続
-3. WebCodecs (`VideoDecoder`) による H.264 AVC420 デコード（`ironrdp-patch/h264_webcodecs.rs`）
+3. WebCodecs (`VideoDecoder`) による H.264 デコード（`ironrdp-patch/h264_webcodecs.rs`）
+   - AVC420 に加えて YUV 4:2:0 プレーン出力に対応し、AVC444 も利用可能（Ubuntu などの描画改善）
 
 再ビルド: `bash build-ironrdp.sh`（Rust / wasm-pack が必要）

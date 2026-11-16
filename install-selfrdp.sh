@@ -38,7 +38,7 @@ SR_APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SR_REPO_URL="https://github.com/hirogura/selfrdp.git"
 SR_API_PORT=7172
 SR_NGINX_PORT=7173
-SR_VERSION="v.0.3.0"
+SR_VERSION="v.0.4.0"
 
 log()  { printf '\033[1;34m[selfRDP]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[warn]\033[0m %s\n' "$*" >&2; }
