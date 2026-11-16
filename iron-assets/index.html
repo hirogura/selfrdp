@@ -43,7 +43,7 @@
 </head>
 <body>
   <div id="bar">
-    <span class="title">selfRDP</span><span class="ver">v.0.4.0</span>
+    <span class="title">selfRDP</span><span class="ver">v.0.5.0</span>
     <span id="keys">
       <button type="button" data-key="halfwidth">半角/全角</button>
       <button type="button" data-key="henkan">変換</button>
@@ -91,13 +91,14 @@
         <label><input type="checkbox" id="autodetect" checked> 方式を自動判定</label>
         <label><input type="checkbox" id="credssp"> NLA / CredSSP を使う</label>
         <label><input type="checkbox" id="perf" checked> 描画を軽量化</label>
+        <label><input type="checkbox" id="savepass"> パスワードを保存</label>
       </div>
       <div id="actions">
         <button id="btn-save" type="button">保存</button>
         <button id="btn-delete" type="button">削除</button>
         <button id="btn-connect" class="primary" type="submit">接続</button>
       </div>
-      <div id="hint">パスワードは保存されません。接続先の設定のみ /opt/selfrdp-data に保存されます。</div>
+      <div id="hint">設定は /opt/selfrdp-data（root のみ読み書き）に保存されます。パスワードは「保存」をチェックした時のみ保存されます。</div>
     </form>
   </div>
   <div id="session"><canvas id="canvas" tabindex="0"></canvas></div>
@@ -227,6 +228,7 @@ function profileData() {
     name: $('name').value.trim(),
     host: $('host').value.trim(),
     username: $('username').value.trim(),
+    password: $('savepass').checked ? $('password').value : '',
     autodetect: $('autodetect').checked,
     credssp: $('credssp').checked,
     width: Number(res[0]), height: Number(res[1]),
@@ -238,6 +240,8 @@ function applyProfile(p) {
   $('name').value = p.name || '';
   $('host').value = p.host || '';
   $('username').value = p.username || '';
+  $('password').value = p.password || '';
+  $('savepass').checked = !!p.password;
   $('autodetect').checked = p.autodetect !== false;
   $('credssp').checked = !!p.credssp;
   $('perf').checked = p.perf !== 0;

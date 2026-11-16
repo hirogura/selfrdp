@@ -16,7 +16,7 @@ import urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = HERE
-VERSION = "v.0.4.0"
+VERSION = "v.0.5.0"
 SERVICES = ["selfrdp.service", "devolutions-gateway.service", "nginx.service"]
 
 DATA_DIR = os.environ.get("SELFRDP_DATA_DIR", "/opt/selfrdp-data")
@@ -197,6 +197,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "name": name,
                     "host": str(profile.get("host", "")).strip(),
                     "username": str(profile.get("username", "")).strip(),
+                    "password": str(profile.get("password", "")),
                     "autodetect": bool(profile.get("autodetect", True)),
                     "credssp": bool(profile.get("credssp", False)),
                     "width": int(profile.get("width", 1280)),

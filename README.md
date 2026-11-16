@@ -12,7 +12,7 @@ RDP の描画は **IronRDP（Rust）を WebAssembly 化したクライアント*
 - `selfrdp-nginx.conf` — リバースプロキシ
 - `build-ironrdp.sh` / `ironrdp-patch/` — IronRDP の再ビルド手順とパッチ
 
-接続先プロファイルは **`/opt/selfrdp-data/profiles.json`**（ワークスペース外・root のみ読み書き）に保存します。誤って GitHub に上げることはありません。パスワードは保存されません。
+接続先プロファイルは **`/opt/selfrdp-data/profiles.json`**（ワークスペース外・root のみ読み書き）に保存します。誤って GitHub に上げることはありません。パスワードはフォームの「パスワードを保存」をチェックした場合のみ保存されます（LXD コンテナ内・Tailscale 経由のみの前提）。
 
 ## 使い方
 

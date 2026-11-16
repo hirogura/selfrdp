@@ -131,7 +131,7 @@ extern "C" {
 
     #[wasm_bindgen(method)]
     fn decode(this: &WebCodecsDecoder, data: &[u8]) -> bool;
-    #[wasm_bindgen(method)]
+    #[wasm_bindgen(method, js_name = "hasYuv")]
     fn has_yuv(this: &WebCodecsDecoder) -> bool;
     #[wasm_bindgen(method, js_name = y)]
     fn y_buf(this: &WebCodecsDecoder) -> Option<Vec<u8>>;
@@ -139,13 +139,13 @@ extern "C" {
     fn u_buf(this: &WebCodecsDecoder) -> Option<Vec<u8>>;
     #[wasm_bindgen(method, js_name = v)]
     fn v_buf(this: &WebCodecsDecoder) -> Option<Vec<u8>>;
-    #[wasm_bindgen(method)]
+    #[wasm_bindgen(method, js_name = "yw")]
     fn yw(this: &WebCodecsDecoder) -> u16;
-    #[wasm_bindgen(method)]
+    #[wasm_bindgen(method, js_name = "yh")]
     fn yh(this: &WebCodecsDecoder) -> u16;
-    #[wasm_bindgen(method)]
+    #[wasm_bindgen(method, js_name = "ylw")]
     fn ylw(this: &WebCodecsDecoder) -> usize;
-    #[wasm_bindgen(method)]
+    #[wasm_bindgen(method, js_name = "ycw")]
     fn ycw(this: &WebCodecsDecoder) -> usize;
     #[wasm_bindgen(method)]
     fn pop(this: &WebCodecsDecoder) -> Option<Vec<u8>>;
@@ -157,7 +157,7 @@ extern "C" {
     fn ready(this: &WebCodecsDecoder) -> bool;
     #[wasm_bindgen(method)]
     fn reset(this: &WebCodecsDecoder);
-    #[wasm_bindgen(method)]
+    #[wasm_bindgen(method, js_name = "lastError")]
     fn last_error(this: &WebCodecsDecoder) -> Option<String>;
 }
 
