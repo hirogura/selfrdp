@@ -43,24 +43,15 @@ def _restart():
 
 
 def _update():
-    """リポジトリを GitHub の最新状態に同期する。"""
+    """リポジトリを GitHub の最新状態に同期する (ローカルの変更は消さない)。"""
     try:
-        if subprocess.run(
-            ["git", "-C", REPO_DIR, "rev-parse", "--verify", "-q", "origin/main"]
-        ).returncode == 0:
-            subprocess.run(["git", "-C", REPO_DIR, "fetch", "origin", "-q"], check=True)
-            subprocess.run(
-                ["git", "-C", REPO_DIR, "reset", "--hard", "origin/main", "-q"],
-                check=True,
-            )
-        else:
-            subprocess.run(
-                ["git", "-C", REPO_DIR, "pull", "--ff-only"],
-                check=True, capture_output=True, text=True,
-            )
+        proc = subprocess.run(
+            ["git", "-C", REPO_DIR, "pull", "--ff-only"],
+            capture_output=True, text=True, timeout=180,
+        )
+        if proc.returncode != 0:
+            return False, "更新に失敗しました: " + (proc.stderr or proc.stdout).strip()
         return True, "GitHub から selfRDP を更新しました"
-    except subprocess.CalledProcessError as exc:
-        return False, "更新に失敗しました: " + (exc.stderr or str(exc)).strip()
     except Exception as exc:
         return False, "更新に失敗しました: " + str(exc)
 

@@ -98,8 +98,10 @@ if [[ -z "$DGW_DEB_URL" ]]; then
   arch="$(dpkg --print-architecture)"
   api="https://api.github.com/repos/Devolutions/devolutions-gateway/releases"
   if [[ -n "$DGW_VERSION" ]]; then api="$api/tags/v${DGW_VERSION#v}"; else api="$api/latest"; fi
-  DGW_DEB_URL="$(curl -fsSL "$api" | jq -r --arg a "$arch" \
-    '[.assets[] | select(.name | test("^devolutions-gateway_.*_" + $a + "\\.deb$"))][0].browser_download_url')"
+  # 新しいリリースは devolutions-gateway-<ver>-x64.deb (旧: _amd64.deb)
+  if [[ "$arch" == "amd64" ]]; then arch_pat="x64|amd64"; else arch_pat="$arch"; fi
+  DGW_DEB_URL="$(curl -fsSL "$api" | jq -r --arg a "$arch_pat" \
+    '[.assets[] | select(.name | test("^devolutions-gateway[-_].*[-_](" + $a + ")\\.deb$"))][0].browser_download_url')"
   [[ -n "$DGW_DEB_URL" && "$DGW_DEB_URL" != "null" ]] || die "$arch 用の .deb が見つかりません (DGW_DEB_URL を指定してください)"
 fi
 log "deb: $DGW_DEB_URL"
@@ -185,7 +187,8 @@ ln -sfn "$SR_APP_DIR/selfrdp-nginx.conf" /etc/nginx/conf.d/selfrdp.conf
 nginx -t
 
 systemctl daemon-reload
-systemctl enable --now nginx >/dev/null 2>&1 || true
+systemctl enable nginx >/dev/null 2>&1 || true
+systemctl restart nginx
 systemctl enable --now selfrdp >/dev/null 2>&1 || true
 
 for _ in $(seq 1 20); do
