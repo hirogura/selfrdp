@@ -63,7 +63,7 @@
 </head>
 <body>
   <div id="bar">
-    <span class="title">selfRDP</span><span class="ver">v.0.8.0</span>
+    <span class="title">selfRDP</span><span class="ver">v.0.9.0</span>
     <span id="keys">
       <button type="button" data-key="halfwidth">半角/全角</button>
       <button type="button" data-key="henkan">変換</button>
@@ -165,7 +165,6 @@ const special = {
 
 let currentSession = null;
 let profiles = [];
-let viewTimer = null;
 let activeIndex = -1;
 
 function updateView() {
@@ -266,10 +265,6 @@ function showSession(on) {
     updateView();
     setTimeout(updateView, 200);
     setTimeout(updateView, 1000);
-    if (viewTimer) clearInterval(viewTimer);
-    viewTimer = setInterval(updateView, 500);
-  } else if (viewTimer) {
-    clearInterval(viewTimer); viewTimer = null;
   }
 }
 

@@ -74,6 +74,23 @@ if ! grep -q 'ironrdp-egfx' crates/ironrdp-web/Cargo.toml; then
   sed -i 's|ironrdp-core.path = "../ironrdp-core"|ironrdp-egfx.path = "../ironrdp-egfx"\nironrdp-core.path = "../ironrdp-core"|' crates/ironrdp-web/Cargo.toml
 fi
 
+# パッチ 2b: canvas を低遅延コンテキストで作成する
+if ! grep -q 'desynchronized' crates/ironrdp-web/src/canvas.rs; then
+  python3 - <<'PYEOF'
+p = 'crates/ironrdp-web/src/canvas.rs'
+s = open(p).read()
+needle = '        canvas\n            .get_context("2d")'
+replacement = ('        let options = js_sys::Object::new();\n'
+               '        js_sys::Reflect::set(&options, &"desynchronized".into(), &true.into()).ok();\n'
+               '        js_sys::Reflect::set(&options, &"alpha".into(), &false.into()).ok();\n'
+               '        canvas\n            .get_context_with_context_options("2d", &options)')
+if s.count(needle) != 1:
+    raise SystemExit('unexpected canvas context block count')
+s = s.replace(needle, replacement, 1)
+open(p, 'w').write(s)
+PYEOF
+fi
+
 # パッチ 3: WebCodecs H.264 デコーダを組み込む
 PATCH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ironrdp-patch"
 if ! grep -q 'mod h264_webcodecs;' crates/ironrdp-web/src/lib.rs; then

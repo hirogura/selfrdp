@@ -50,7 +50,7 @@ export class WebCodecsDecoder {
       });
       this.decoder.configure({
         codec: 'avc1.42001f',
-        hardwareAcceleration: 'no-preference',
+        hardwareAcceleration: 'prefer-hardware',
         optimizeForLatency: true
       });
       this.ok = true;
