@@ -60,7 +60,7 @@
 </head>
 <body>
   <div id="bar">
-    <span class="title">selfRDP</span><span class="ver">v.0.7.0</span>
+    <span class="title">selfRDP</span><span class="ver">v.0.7.1</span>
     <span id="keys">
       <button type="button" data-key="halfwidth">半角/全角</button>
       <button type="button" data-key="henkan">変換</button>
@@ -198,8 +198,21 @@ function sendTransaction(events) {
   currentSession.applyInputs(t);
 }
 
+let inputAbort = null;
+
+function unbindInput() {
+  if (inputAbort) { inputAbort.abort(); inputAbort = null; }
+  currentSession = null;
+}
+
 function bindInput(session) {
+  // 再接続ごとにリスナーが積み上がると 1 回の入力が複数回送られるため、
+  // 古いリスナーを必ず破棄してから張り直す。
+  unbindInput();
   currentSession = session;
+  const ac = new AbortController();
+  inputAbort = ac;
+  const opt = { signal: ac.signal };
   updateView();
   canvas.addEventListener('mousemove', e => {
     const r = canvas.getBoundingClientRect();
@@ -216,28 +229,28 @@ function bindInput(session) {
     const x = (e.clientX - r.left - ox) / scaleX;
     const y = (e.clientY - r.top - oy) / scaleY;
     sendTransaction([DeviceEvent.mouseMove(x, y)]);
-  });
-  canvas.addEventListener('mousedown', e => sendTransaction([DeviceEvent.mouseButtonPressed(e.button)]));
-  canvas.addEventListener('mouseup', e => sendTransaction([DeviceEvent.mouseButtonReleased(e.button)]));
+  }, opt);
+  canvas.addEventListener('mousedown', e => sendTransaction([DeviceEvent.mouseButtonPressed(e.button)]), opt);
+  canvas.addEventListener('mouseup', e => sendTransaction([DeviceEvent.mouseButtonReleased(e.button)]), opt);
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     sendTransaction([DeviceEvent.wheelRotations(true, e.deltaY > 0 ? -1 : 1, 0)]);
-  }, { passive: false });
+  }, { passive: false, signal: ac.signal });
   canvas.addEventListener('keydown', e => {
     const sc = scancodes[e.code];
     if (sc !== undefined) { e.preventDefault(); sendTransaction([DeviceEvent.keyPressed(sc)]); }
-  });
+  }, opt);
   canvas.addEventListener('keyup', e => {
     const sc = scancodes[e.code];
     if (sc !== undefined) { e.preventDefault(); sendTransaction([DeviceEvent.keyReleased(sc)]); }
-  });
+  }, opt);
   keys.querySelectorAll('button[data-key]').forEach(btn => {
     btn.addEventListener('click', () => {
       const seq = special[btn.dataset.key] || [];
       sendTransaction(seq.map(sc => DeviceEvent.keyPressed(sc)));
       setTimeout(() => sendTransaction(seq.slice().reverse().map(sc => DeviceEvent.keyReleased(sc))), 90);
       canvas.focus();
-    });
+    }, opt);
   });
 }
 
@@ -379,7 +392,7 @@ async function connect(p) {
   bindInput(session);
   const info = await session.run();
   msg.textContent = 'セッション終了: ' + info.reason();
-  currentSession = null;
+  unbindInput();
   showSession(false);
 }
 
@@ -393,7 +406,7 @@ form.addEventListener('submit', async e => {
 
 disconnectBtn.addEventListener('click', () => {
   if (!currentSession || !confirm('接続を切断しますか？')) return;
-  currentSession.shutdown(); currentSession = null; showSession(false);
+  currentSession.shutdown(); unbindInput(); showSession(false);
   msg.textContent = '切断しました';
 });
 
