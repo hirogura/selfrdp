@@ -27,14 +27,17 @@
     background: #171b24; border-right: 1px solid #2b3240; }
   #sidebar h3 { margin: 2px 0 10px; font-size: 12px; color: #8d9bb0; font-weight: 600; }
   .card { position: relative; background: #202634; border: 1px solid #333c4d; border-radius: 8px;
-    padding: 10px 26px 10px 10px; margin-bottom: 8px; cursor: pointer; }
+    padding: 10px 48px 10px 10px; margin-bottom: 8px; cursor: pointer; }
   .card:hover { border-color: #6cb6ff; background: #263040; }
   .card.active { border-color: #2ecc71; background: #1d3229; }
   .card .name { font-size: 13px; font-weight: 600; }
   .card .host { font-size: 11px; color: #8d9bb0; margin-top: 3px; word-break: break-all; }
   .card .badge { font-size: 9px; color: #2ecc71; margin-top: 2px; }
-  .card .del { position: absolute; top: 5px; right: 5px; padding: 1px 5px; font-size: 11px;
+  .card .act { position: absolute; top: 5px; padding: 1px 5px; font-size: 11px;
     background: transparent; border-color: transparent; color: #8d9bb0; }
+  .card .edit { right: 26px; }
+  .card .del { right: 5px; }
+  .card .edit:hover { color: #6cb6ff; border-color: #2b5878; }
   .card .del:hover { color: #ff7b84; border-color: #7a2630; }
   #main { flex: 1; min-width: 0; position: relative; overflow: hidden; }
   #wrap { height: 100%; display: flex; align-items: center; justify-content: center; overflow: auto; }
@@ -60,7 +63,7 @@
 </head>
 <body>
   <div id="bar">
-    <span class="title">selfRDP</span><span class="ver">v.0.7.1</span>
+    <span class="title">selfRDP</span><span class="ver">v.0.8.0</span>
     <span id="keys">
       <button type="button" data-key="halfwidth">半角/全角</button>
       <button type="button" data-key="henkan">変換</button>
@@ -306,7 +309,14 @@ function renderCards() {
     const host = document.createElement('div'); host.className = 'host'; host.textContent = p.host;
     const badge = document.createElement('div'); badge.className = 'badge';
     badge.textContent = p.password ? 'パスワード保存済み' : (p.credssp ? 'NLA' : 'TLS');
-    const del = document.createElement('button'); del.className = 'del'; del.textContent = '×'; del.title = '削除';
+    const edit = document.createElement('button'); edit.className = 'act edit'; edit.textContent = '⚙'; edit.title = '編集';
+    edit.addEventListener('click', e => {
+      e.stopPropagation();
+      applyProfile(p, i);
+      msg.textContent = '「' + p.name + '」を編集中です。変更したら「保存」を押してください。';
+      $('name').focus();
+    });
+    const del = document.createElement('button'); del.className = 'act del'; del.textContent = '×'; del.title = '削除';
     del.addEventListener('click', async e => {
       e.stopPropagation();
       if (!confirm('「' + p.name + '」を削除しますか？')) return;
@@ -314,7 +324,7 @@ function renderCards() {
         body: JSON.stringify({ action:'delete', name:p.name }) });
       await loadProfiles();
     });
-    card.append(name, host, badge, del);
+    card.append(name, host, badge, edit, del);
     card.addEventListener('click', async () => {
       applyProfile(p, i);
       if (p.password) {
